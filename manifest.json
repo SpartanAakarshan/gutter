@@ -1,14 +1,14 @@
 {
   "manifest_version": 3,
-  "name": "Curiosity Pointer",
+  "name": "Gutter",
   "version": "1.0",
-  "description": "Alt+Click any heading for a 2-sentence AI summary. Stay focused.",
+  "description": "Context without clutter. Alt+Click any heading for instant context — no new tabs, no rabbit holes.",
   "permissions": ["activeTab", "storage"],
   "options_page": "options.html",
   "icons": { "128": "icon128.png" },
   "action": { "default_icon": { "128": "icon128.png" } },
   "host_permissions": [
-    "https://curiosity-pointer-api.vercel.app/*"
+    "https://gutter-api.vercel.app/*"
   ],
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'none';"

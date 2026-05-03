@@ -4,7 +4,7 @@ let tooltipBox = null;
 
 function buildTooltip() {
   const host = document.createElement('div');
-  host.id = 'curiosity-pointer-host';
+  host.id = 'gutter-host';
   host.style.cssText = 'position:absolute;z-index:2147483647;display:none;pointer-events:none;';
 
   const shadow = host.attachShadow({ mode: 'closed' });
@@ -98,7 +98,7 @@ function showLoading() {
 
   const label = document.createElement('div');
   label.className = 'label';
-  label.textContent = 'Curiosity Pointer';
+  label.textContent = 'Gutter';
 
   const loading = document.createElement('span');
   loading.className = 'loading';
@@ -158,11 +158,11 @@ function update(text, remaining = null) {
   const footer = remaining !== null && remaining <= 3
     ? `${remaining} free search${remaining === 1 ? '' : 'es'} left — upgrade for $5/mo`
     : null;
-  buildBox('Curiosity Pointer', text, footer);
+  buildBox('Gutter', text, footer);
 }
 
 function updateUpgrade(message) {
-  buildBox('Upgrade Required', message, 'Get unlimited access →', 'https://curiosity-pointer-api.vercel.app/upgrade');
+  buildBox('Upgrade Required', message, 'Get unlimited access →', 'https://gutter-api.vercel.app/upgrade');
 }
 
 function hide() {
@@ -196,8 +196,8 @@ function attachHeader(el) {
   if (el.dataset.cpAttached) return;
   el.dataset.cpAttached = 'true';
 
-  el.addEventListener('mouseenter', () => document.body.classList.add('curiosity-mode'));
-  el.addEventListener('mouseleave', () => document.body.classList.remove('curiosity-mode'));
+  el.addEventListener('mouseenter', () => document.body.classList.add('gutter-mode'));
+  el.addEventListener('mouseleave', () => document.body.classList.remove('gutter-mode'));
 
   el.addEventListener('click', (e) => {
     if (!e.altKey) return;

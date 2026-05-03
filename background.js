@@ -1,4 +1,4 @@
-const PROXY_URL    = 'https://curiosity-pointer-api.vercel.app/api/explain';
+const PROXY_URL    = 'https://gutter-api.vercel.app/api/explain';
 const REFRESH_URL  = 'https://krirwdkqjezbzyythioq.supabase.co/auth/v1/token?grant_type=refresh_token';
 const SUPABASE_ANON = 'sb_publishable_FjoiQluqAIe3hl3ufdWfaA_BJGr7e5b';
 

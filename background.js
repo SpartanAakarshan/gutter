@@ -30,14 +30,25 @@ async function callProxy(text, retries = 1) {
     return { error: 'Not logged in. Open extension options to sign in.' };
   }
 
-  const r = await fetch(PROXY_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
-    },
-    body: JSON.stringify({ text })
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 15000);
+
+  let r;
+  try {
+    r = await fetch(PROXY_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ text }),
+      signal: controller.signal
+    });
+  } catch (e) {
+    clearTimeout(timer);
+    return { error: e.name === 'AbortError' ? 'Request timed out.' : e.message };
+  }
+  clearTimeout(timer);
 
   if (r.status === 401) {
     const newToken = await refreshToken();

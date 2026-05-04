@@ -1,75 +1,118 @@
 const SUPABASE_URL  = 'https://krirwdkqjezbzyythioq.supabase.co';
 const SUPABASE_ANON = 'sb_publishable_FjoiQluqAIe3hl3ufdWfaA_BJGr7e5b';
+const API_BASE      = 'https://gutter-api.vercel.app/api';
 
-const status    = document.getElementById('status');
-const loggedIn  = document.getElementById('logged-in');
-const loggedOut = document.getElementById('logged-out');
-const userEmail = document.getElementById('user-email');
+const statusEl      = document.getElementById('status');
+const loggedInEl    = document.getElementById('logged-in');
+const loggedOutEl   = document.getElementById('logged-out');
+const userEmailEl   = document.getElementById('user-email');
+const keyConfigured = document.getElementById('key-configured');
+const keyMissing    = document.getElementById('key-missing');
 
 function showStatus(msg, isError = false) {
-  status.textContent = msg;
-  status.className = isError ? 'err' : 'ok';
-}
-
-async function supabaseFetch(path, body) {
-  const res = await fetch(`${SUPABASE_URL}/auth/v1/${path}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'apikey': SUPABASE_ANON
-    },
-    body: JSON.stringify(body)
-  });
-  return res.json();
+  statusEl.textContent = msg;
+  statusEl.className = isError ? 'err' : 'ok';
 }
 
 async function checkSession() {
-  const { token, email } = await chrome.storage.local.get(['token', 'email']);
-  if (token) {
-    loggedOut.style.display = 'none';
-    loggedIn.style.display = 'block';
-    userEmail.textContent = email ?? '';
-  } else {
-    loggedOut.style.display = 'block';
-    loggedIn.style.display = 'none';
+  const { token, email, hasKey } = await chrome.storage.local.get(['token', 'email', 'hasKey']);
+  if (!token) {
+    loggedOutEl.style.display = 'block';
+    loggedInEl.style.display  = 'none';
+    return;
   }
+  loggedOutEl.style.display = 'none';
+  loggedInEl.style.display  = 'block';
+  userEmailEl.textContent   = email ?? '';
+  keyConfigured.style.display = hasKey ? 'block' : 'none';
+  keyMissing.style.display    = hasKey ? 'none'  : 'block';
 }
 
-document.getElementById('btn-login').addEventListener('click', async () => {
-  const email    = document.getElementById('email').value.trim();
-  const password = document.getElementById('password').value;
-  if (!email || !password) return showStatus('Email and password required.', true);
+document.getElementById('btn-google').addEventListener('click', () => {
+  showStatus('Opening sign-in…');
 
-  showStatus('Logging in…');
-  const data = await supabaseFetch('token?grant_type=password', { email, password });
+  const redirectURL = chrome.identity.getRedirectURL();
+  const oauthURL    = `${SUPABASE_URL}/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(redirectURL)}`;
 
-  if (data.access_token) {
-    await chrome.storage.local.set({ token: data.access_token, refreshToken: data.refresh_token, email });
-    showStatus('Logged in.');
+  chrome.identity.launchWebAuthFlow({ url: oauthURL, interactive: true }, async (redirectUrl) => {
+    if (chrome.runtime.lastError || !redirectUrl) {
+      showStatus('Sign in cancelled or failed.', true);
+      return;
+    }
+
+    const hash         = new URL(redirectUrl).hash.substring(1);
+    const params       = new URLSearchParams(hash);
+    const token        = params.get('access_token');
+    const refreshToken = params.get('refresh_token');
+
+    if (!token) {
+      showStatus('No token received. Try again.', true);
+      return;
+    }
+
+    const userRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+      headers: { 'Authorization': `Bearer ${token}`, 'apikey': SUPABASE_ANON }
+    });
+    const user = await userRes.json();
+
+    await chrome.storage.local.set({ token, refreshToken, email: user.email, hasKey: false });
+    showStatus('Signed in.');
+    checkSession();
+  });
+});
+
+document.getElementById('btn-save-key').addEventListener('click', async () => {
+  const apiKey = document.getElementById('api-key').value.trim();
+  if (!apiKey || apiKey.length < 10) {
+    showStatus('Enter a valid API key.', true);
+    return;
+  }
+
+  const btn = document.getElementById('btn-save-key');
+  btn.disabled = true;
+  showStatus('Saving…');
+
+  const { token } = await chrome.storage.local.get('token');
+  const res  = await fetch(`${API_BASE}/keys`, {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+    body:    JSON.stringify({ apiKey, provider: 'gemini' })
+  });
+  const data = await res.json();
+  btn.disabled = false;
+
+  if (data.success) {
+    await chrome.storage.local.set({ hasKey: true });
+    document.getElementById('api-key').value = '';
+    showStatus('API key saved.');
     checkSession();
   } else {
-    showStatus(data.error_description ?? 'Login failed.', true);
+    showStatus(data.error ?? 'Failed to save key.', true);
   }
 });
 
-document.getElementById('btn-signup').addEventListener('click', async () => {
-  const email    = document.getElementById('email').value.trim();
-  const password = document.getElementById('password').value;
-  if (!email || !password) return showStatus('Email and password required.', true);
-  if (password.length < 8) return showStatus('Password must be 8+ characters.', true);
+document.getElementById('btn-remove-key').addEventListener('click', async () => {
+  if (!confirm('Remove your API key?')) return;
 
-  showStatus('Creating account…');
-  const data = await supabaseFetch('signup', { email, password });
+  showStatus('Removing…');
+  const { token } = await chrome.storage.local.get('token');
+  const res  = await fetch(`${API_BASE}/keys`, {
+    method:  'DELETE',
+    headers: { 'Authorization': `Bearer ${token}` }
+  });
+  const data = await res.json();
 
-  if (data.id) {
-    showStatus('Account created. Check email to confirm, then log in.');
+  if (data.success) {
+    await chrome.storage.local.set({ hasKey: false });
+    showStatus('Key removed.');
+    checkSession();
   } else {
-    showStatus(data.error_description ?? 'Signup failed.', true);
+    showStatus(data.error ?? 'Failed to remove key.', true);
   }
 });
 
 document.getElementById('btn-logout').addEventListener('click', async () => {
-  await chrome.storage.local.remove(['token', 'email', 'refreshToken']);
+  await chrome.storage.local.remove(['token', 'email', 'refreshToken', 'hasKey']);
   showStatus('Logged out.');
   checkSession();
 });

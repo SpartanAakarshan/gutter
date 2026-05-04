@@ -183,7 +183,7 @@ function askGemini(text, x, y) {
 chrome.runtime.onMessage.addListener((message) => {
   if (message.action !== 'result') return;
   clearTimeout(pendingTimer);
-  if (message.error === 'UPGRADE_REQUIRED') {
+  if (message.error === 'UPGRADE_REQUIRED' || message.error === 'NO_API_KEY') {
     updateUpgrade(message.message);
   } else if (message.result) {
     update(message.result, message.remaining);

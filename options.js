@@ -1,5 +1,5 @@
-const SUPABASE_URL  = 'https://krirwdkqjezbzyythioq.supabase.co';
-const SUPABASE_ANON = 'sb_publishable_FjoiQluqAIe3hl3ufdWfaA_BJGr7e5b';
+const SUPABASE_URL  = 'https://zwetyinnzamzmsvnraax.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp3ZXR5aW5uemFtem1zdm5yYWF4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4NzQwNjAsImV4cCI6MjA5MzQ1MDA2MH0.hFjRaqJ-y3cbyKu5Jw6IzREfOBRKOpFynuaxinuJyJM';
 const API_BASE      = 'https://gutter-api.vercel.app/api';
 
 const statusEl      = document.getElementById('status');

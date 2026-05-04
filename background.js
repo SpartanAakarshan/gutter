@@ -1,6 +1,6 @@
 const PROXY_URL    = 'https://gutter-api.vercel.app/api/explain';
-const REFRESH_URL  = 'https://krirwdkqjezbzyythioq.supabase.co/auth/v1/token?grant_type=refresh_token';
-const SUPABASE_ANON = 'sb_publishable_FjoiQluqAIe3hl3ufdWfaA_BJGr7e5b';
+const REFRESH_URL  = 'https://zwetyinnzamzmsvnraax.supabase.co/auth/v1/token?grant_type=refresh_token';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp3ZXR5aW5uemFtem1zdm5yYWF4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4NzQwNjAsImV4cCI6MjA5MzQ1MDA2MH0.hFjRaqJ-y3cbyKu5Jw6IzREfOBRKOpFynuaxinuJyJM';
 
 async function refreshToken() {
   const { refreshToken } = await chrome.storage.local.get('refreshToken');

@@ -126,6 +126,8 @@ chrome.runtime.onMessage.addListener((message, sender) => {
   if (!tabId) return;
 
   (async () => {
+    if (typeof message.text !== 'string' || !message.text) return;
+
     const cached = await getCached(message.text);
     if (cached) {
       chrome.tabs.sendMessage(tabId, { action: 'result', result: cached }).catch(() => {});

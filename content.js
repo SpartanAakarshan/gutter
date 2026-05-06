@@ -157,8 +157,16 @@ function update(text, remaining = null) {
   buildBox('Gutter', text, footer);
 }
 
+let _sessionToken = null;
+chrome.storage.local.get('token').then(({ token }) => { _sessionToken = token ?? null; });
+
+function upgradeURL() {
+  const base = 'https://gutter-api.vercel.app/upgrade';
+  return _sessionToken ? `${base}?t=${encodeURIComponent(_sessionToken)}` : base;
+}
+
 function updateUpgrade(message) {
-  buildBox('Upgrade Required', message, 'Get unlimited access →', 'https://gutter-api.vercel.app/upgrade');
+  buildBox('Upgrade Required', message, 'Get unlimited access →', upgradeURL());
 }
 
 function updateError(message) {

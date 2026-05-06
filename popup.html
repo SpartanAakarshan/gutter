@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gutter</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      width: 220px;
+      background: #000000;
+      color: rgba(255,255,255,0.6);
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 11px;
+      padding: 16px;
+      user-select: none;
+    }
+
+    .wordmark {
+      font-size: 10px;
+      letter-spacing: 0.35em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.25);
+      padding-bottom: 12px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      margin-bottom: 16px;
+    }
+
+    .row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+
+    .label {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .label-main {
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.8);
+    }
+
+    .label-sub {
+      font-size: 9px;
+      letter-spacing: 0.08em;
+      color: rgba(255,255,255,0.25);
+    }
+
+    /* Turbo button toggle */
+    .turbo {
+      position: relative;
+      width: 44px;
+      height: 22px;
+      flex-shrink: 0;
+    }
+
+    .turbo input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+      position: absolute;
+    }
+
+    .turbo-face {
+      position: absolute;
+      inset: 0;
+      background: #111111;
+      border: 1px solid rgba(255,255,255,0.2);
+      cursor: pointer;
+      transition: border-color 80ms;
+    }
+
+    /* mechanical raised nub */
+    .turbo-nub {
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      width: 14px;
+      height: 14px;
+      background: #2a2a2a;
+      border-top: 1px solid rgba(255,255,255,0.3);
+      border-left: 1px solid rgba(255,255,255,0.2);
+      border-right: 1px solid rgba(0,0,0,0.6);
+      border-bottom: 1px solid rgba(0,0,0,0.6);
+      transition: left 80ms, background 80ms, border 80ms, top 80ms;
+    }
+
+    .turbo input:checked ~ .turbo-face {
+      border-color: rgba(255,255,255,0.7);
+      background: #0a0a0a;
+    }
+
+    /* pressed-in state when active */
+    .turbo input:checked ~ .turbo-face .turbo-nub {
+      left: 25px;
+      background: #ffffff;
+      border-top: 1px solid rgba(0,0,0,0.4);
+      border-left: 1px solid rgba(0,0,0,0.3);
+      border-right: 1px solid rgba(255,255,255,0.2);
+      border-bottom: 1px solid rgba(255,255,255,0.2);
+      top: 4px;
+    }
+
+    .status-line {
+      margin-top: 4px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(255,255,255,0.06);
+      font-size: 9px;
+      letter-spacing: 0.1em;
+      color: rgba(255,255,255,0.2);
+      text-transform: uppercase;
+      min-height: 16px;
+      transition: color 200ms;
+    }
+
+    .status-line.active {
+      color: rgba(255,255,255,0.6);
+    }
+
+    .blink {
+      display: inline-block;
+      width: 5px;
+      height: 5px;
+      background: #ffffff;
+      margin-right: 5px;
+      vertical-align: middle;
+      animation: blink 1s step-end infinite;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="wordmark">Gutter</div>
+
+  <div class="row">
+    <div class="label">
+      <span class="label-main">Deep Dive</span>
+      <span class="label-sub">Page-aware context</span>
+    </div>
+    <label class="turbo">
+      <input type="checkbox" id="deep-dive-toggle">
+      <div class="turbo-face">
+        <div class="turbo-nub"></div>
+      </div>
+    </label>
+  </div>
+
+  <div class="status-line" id="status"></div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

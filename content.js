@@ -158,7 +158,7 @@ function update(text, remaining = null) {
 }
 
 let _sessionToken = null;
-chrome.storage.local.get('token').then(({ token }) => { _sessionToken = token ?? null; });
+chrome.storage.local.get('token').then(({ token }) => { _sessionToken = token ?? null; }).catch(() => {});
 
 // Deep Dive: scraped once per page load, sent with first explain request
 let _metaSent = false;
@@ -210,7 +210,12 @@ function askGemini(text, x, y) {
     msg.meta = scrapePageMetadata();
     _metaSent = true;
   }
-  chrome.runtime.sendMessage(msg);
+  try {
+    chrome.runtime.sendMessage(msg);
+  } catch (e) {
+    clearTimeout(pendingTimer);
+    updateError('Extension updated — reload the page and try again.');
+  }
 }
 
 // Receive result pushed back from background

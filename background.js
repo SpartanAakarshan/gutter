@@ -75,7 +75,7 @@ async function refreshToken() {
   return data.access_token;
 }
 
-async function callProxy(text, retries = 1) {
+async function callProxy(text, meta = null, retries = 1) {
   let { token } = await chrome.storage.local.get('token');
 
   if (!token) {
@@ -93,7 +93,7 @@ async function callProxy(text, retries = 1) {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`
       },
-      body: JSON.stringify({ text }),
+      body: JSON.stringify({ text, ...(meta && { meta }) }),
       signal: controller.signal
     });
   } catch (e) {
@@ -105,7 +105,7 @@ async function callProxy(text, retries = 1) {
   if (r.status === 401) {
     const newToken = await refreshToken();
     if (newToken && retries > 0) {
-      return callProxy(text, retries - 1);
+      return callProxy(text, meta, retries - 1);
     }
     await chrome.storage.local.remove(['token', 'email', 'refreshToken']);
     return { error: 'Session expired. Please log in again via extension options.' };
@@ -113,11 +113,25 @@ async function callProxy(text, retries = 1) {
 
   if (r.status === 503 && retries > 0) {
     await new Promise(res => setTimeout(res, 3000));
-    return callProxy(text, retries - 1);
+    return callProxy(text, meta, retries - 1);
   }
 
   return r.json();
 }
+
+async function getSessionMeta(tabId) {
+  const key = `meta_${tabId}`;
+  const result = await chrome.storage.session.get(key);
+  return result[key] ?? null;
+}
+
+async function storeSessionMeta(tabId, meta) {
+  await chrome.storage.session.set({ [`meta_${tabId}`]: meta });
+}
+
+chrome.tabs.onRemoved.addListener((tabId) => {
+  chrome.storage.session.remove(`meta_${tabId}`);
+});
 
 chrome.runtime.onMessage.addListener((message, sender) => {
   if (message.action !== 'explain') return;
@@ -127,6 +141,8 @@ chrome.runtime.onMessage.addListener((message, sender) => {
 
   (async () => {
     if (typeof message.text !== 'string' || !message.text) return;
+
+    if (message.meta) await storeSessionMeta(tabId, message.meta);
 
     const cached = await getCached(message.text);
     if (cached) {
@@ -144,8 +160,11 @@ chrome.runtime.onMessage.addListener((message, sender) => {
       return;
     }
 
+    const { deepDive } = await chrome.storage.local.get('deepDive');
+    const meta = deepDive ? await getSessionMeta(tabId) : null;
+
     try {
-      const data = await callProxy(message.text);
+      const data = await callProxy(message.text, meta);
       if (data.result) {
         await storeCached(message.text, data.result);
         await incrementLocalCount();

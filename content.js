@@ -160,6 +160,19 @@ function update(text, remaining = null) {
 let _sessionToken = null;
 chrome.storage.local.get('token').then(({ token }) => { _sessionToken = token ?? null; });
 
+// Deep Dive: scraped once per page load, sent with first explain request
+let _metaSent = false;
+
+function scrapePageMetadata() {
+  const cap = (s) => (s ?? '').trim().slice(0, 200);
+  return {
+    title:    cap(document.title),
+    metaDesc: cap(document.querySelector('meta[name="description"]')?.content),
+    ogDesc:   cap(document.querySelector('meta[property="og:description"]')?.content),
+    h1:       cap(document.querySelector('h1')?.innerText)
+  };
+}
+
 function upgradeURL() {
   const base = 'https://gutter-api.vercel.app/upgrade';
   return _sessionToken ? `${base}?t=${encodeURIComponent(_sessionToken)}` : base;
@@ -191,7 +204,13 @@ function askGemini(text, x, y) {
   show(x, y);
   clearTimeout(pendingTimer);
   pendingTimer = setTimeout(() => updateError('Timed out. Try again.'), 20000);
-  chrome.runtime.sendMessage({ action: 'explain', text: trimmed });
+
+  const msg = { action: 'explain', text: trimmed };
+  if (!_metaSent) {
+    msg.meta = scrapePageMetadata();
+    _metaSent = true;
+  }
+  chrome.runtime.sendMessage(msg);
 }
 
 // Receive result pushed back from background

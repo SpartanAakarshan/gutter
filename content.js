@@ -158,9 +158,13 @@ function update(text, remaining = null) {
 }
 
 let _sessionToken = null;
-chrome.storage.local.get('token').then(({ token }) => { _sessionToken = token ?? null; }).catch(() => {});
+let _deepDive = false;
+chrome.storage.local.get(['token', 'deepDive']).then(({ token, deepDive }) => {
+  _sessionToken = token ?? null;
+  _deepDive = !!deepDive;
+}).catch(() => {});
 
-// Deep Dive: scraped once per page load, sent with first explain request
+// Deep Dive: scraped once per page load, only when mode is active
 let _metaSent = false;
 
 function scrapePageMetadata() {
@@ -206,7 +210,7 @@ function askGemini(text, x, y) {
   pendingTimer = setTimeout(() => updateError('Timed out. Try again.'), 20000);
 
   const msg = { action: 'explain', text: trimmed };
-  if (!_metaSent) {
+  if (_deepDive && !_metaSent) {
     msg.meta = scrapePageMetadata();
     _metaSent = true;
   }

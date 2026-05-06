@@ -1,4 +1,5 @@
 const PROXY_URL    = 'https://gutter-api.vercel.app/api/explain';
+const STATUS_URL   = 'https://gutter-api.vercel.app/api/status';
 const REFRESH_URL  = 'https://zwetyinnzamzmsvnraax.supabase.co/auth/v1/token?grant_type=refresh_token';
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp3ZXR5aW5uemFtem1zdm5yYWF4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4NzQwNjAsImV4cCI6MjA5MzQ1MDA2MH0.hFjRaqJ-y3cbyKu5Jw6IzREfOBRKOpFynuaxinuJyJM';
 
@@ -43,6 +44,22 @@ async function incrementLocalCount() {
   await chrome.storage.local.set({ localUsage: { date: today, count } });
 }
 
+async function fetchPlanStatus(token) {
+  try {
+    const r = await fetch(STATUS_URL, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (!r.ok) return;
+    const { isPro } = await r.json();
+    await chrome.storage.local.set({ isPro: !!isPro });
+  } catch {}
+}
+
+// Fetch plan on startup if token exists
+chrome.storage.local.get('token').then(({ token }) => {
+  if (token) fetchPlanStatus(token);
+}).catch(() => {});
+
 async function refreshToken() {
   const { refreshToken } = await chrome.storage.local.get('refreshToken');
   if (!refreshToken) return null;
@@ -72,6 +89,7 @@ async function refreshToken() {
     refreshToken: data.refresh_token
   });
 
+  fetchPlanStatus(data.access_token);
   return data.access_token;
 }
 

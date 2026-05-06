@@ -90,6 +90,17 @@ async function handleTokens(token, refreshToken) {
     }
   } catch {}
   await chrome.storage.local.set({ token, refreshToken, email, hasKey: false });
+
+  try {
+    const statusRes = await fetchWithTimeout(`${API_BASE}/status`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    if (statusRes.ok) {
+      const { isPro } = await statusRes.json();
+      await chrome.storage.local.set({ isPro: !!isPro });
+    }
+  } catch {}
+
   showStatus('Signed in.');
   checkSession();
 }

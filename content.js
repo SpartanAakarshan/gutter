@@ -2,6 +2,102 @@ let tooltipHost = null;
 let tooltipShadow = null;
 let tooltipBox = null;
 
+// ── Deep Dive floating widget ────────────────────────────────────────────────
+let _widgetHost = null;
+
+function buildWidget(isPro, deepDiveOn) {
+  if (_widgetHost) _widgetHost.remove();
+
+  const host = document.createElement('div');
+  host.id = 'gutter-widget';
+  host.style.cssText = 'position:fixed;top:14px;right:14px;z-index:2147483646;pointer-events:auto;';
+  const shadow = host.attachShadow({ mode: 'closed' });
+
+  const style = document.createElement('style');
+  style.textContent = `
+    .widget {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: #000000;
+      border: 1px solid ${deepDiveOn ? 'rgba(255,255,255,0.75)' : 'rgba(255,255,255,0.18)'};
+      padding: 5px 10px 5px 8px;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 9px;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: ${deepDiveOn ? '#ffffff' : 'rgba(255,255,255,0.35)'};
+      cursor: pointer;
+      user-select: none;
+      transition: border-color 100ms, color 100ms;
+      white-space: nowrap;
+    }
+    .widget:hover {
+      border-color: rgba(255,255,255,0.6);
+      color: rgba(255,255,255,0.8);
+    }
+    .dot {
+      width: 5px; height: 5px;
+      background: ${deepDiveOn ? '#ffffff' : 'rgba(255,255,255,0.2)'};
+      border-radius: 50%;
+      flex-shrink: 0;
+      ${deepDiveOn ? 'animation: pulse 1.4s ease-in-out infinite;' : ''}
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+    .lock { font-size: 8px; opacity: 0.4; }
+  `;
+
+  const btn = document.createElement('div');
+  btn.className = 'widget';
+
+  const dot = document.createElement('span');
+  dot.className = 'dot';
+
+  const label = document.createElement('span');
+
+  if (!isPro) {
+    label.textContent = 'Deep Dive';
+    const lock = document.createElement('span');
+    lock.className = 'lock';
+    lock.textContent = '⊘ Pro';
+    btn.appendChild(dot);
+    btn.appendChild(label);
+    btn.appendChild(lock);
+    btn.addEventListener('click', () => {
+      window.open('https://gutter-api.vercel.app/upgrade', '_blank');
+    });
+  } else {
+    label.textContent = deepDiveOn ? 'Deep Dive: On' : 'Deep Dive: Off';
+    btn.appendChild(dot);
+    btn.appendChild(label);
+    btn.addEventListener('click', () => {
+      const next = !_deepDive;
+      _deepDive = next;
+      _metaSent = false;
+      chrome.storage.local.set({ deepDive: next });
+      buildWidget(true, next);
+    });
+  }
+
+  shadow.appendChild(style);
+  shadow.appendChild(btn);
+  document.documentElement.appendChild(host);
+  _widgetHost = host;
+}
+
+function initWidget() {
+  chrome.storage.local.get(['isPro', 'deepDive', 'token']).then(({ isPro, deepDive, token }) => {
+    if (!token) return;
+    buildWidget(!!isPro, !!deepDive);
+  }).catch(() => {});
+}
+
+initWidget();
+// ─────────────────────────────────────────────────────────────────────────────
+
 function buildTooltip() {
   const host = document.createElement('div');
   host.id = 'gutter-host';

@@ -13,20 +13,43 @@ const keyMissing    = document.getElementById('key-missing');
 const ddToggle = document.getElementById('dd-toggle');
 const ddRow    = document.getElementById('dd-row');
 const ddSub    = document.getElementById('dd-sub');
+const ddLock   = document.getElementById('dd-lock');
 
-function applyDeepDive(on) {
+function applyDeepDive(on, isPro) {
+  if (!isPro) {
+    ddToggle.disabled = true;
+    ddToggle.checked  = false;
+    ddRow.className   = 'deep-dive-row dd-locked';
+    ddSub.textContent = 'Pro feature — upgrade to unlock';
+    ddSub.className   = 'dd-sub';
+    ddLock.style.display = 'inline';
+    return;
+  }
+  ddToggle.disabled = false;
+  ddLock.style.display = 'none';
   ddToggle.checked  = on;
   ddRow.className   = on ? 'deep-dive-row dd-on' : 'deep-dive-row';
   ddSub.textContent = on ? 'On — replies scoped to this page' : 'Off — standard two-sentence reply';
   ddSub.className   = on ? 'dd-sub dd-on' : 'dd-sub';
 }
 
-chrome.storage.local.get('deepDive').then(({ deepDive }) => applyDeepDive(!!deepDive));
+chrome.storage.local.get(['deepDive', 'isPro']).then(({ deepDive, isPro }) => {
+  applyDeepDive(!!deepDive, !!isPro);
+});
+
+ddRow.addEventListener('click', (e) => {
+  chrome.storage.local.get('isPro').then(({ isPro }) => {
+    if (!isPro) {
+      chrome.tabs.create({ url: 'https://gutter-api.vercel.app/upgrade' });
+      return;
+    }
+  });
+});
 
 ddToggle.addEventListener('change', () => {
   const on = ddToggle.checked;
   chrome.storage.local.set({ deepDive: on });
-  applyDeepDive(on);
+  chrome.storage.local.get('isPro').then(({ isPro }) => applyDeepDive(on, !!isPro));
 });
 
 function showStatus(msg, isError = false) {

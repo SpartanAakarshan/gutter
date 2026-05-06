@@ -148,11 +148,60 @@
 
     #logged-in  { display: none; }
     #logged-out { display: block; }
+
+    .deep-dive-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 14px;
+      border: 1px solid rgba(255,255,255,0.12);
+      margin-bottom: 20px;
+      cursor: pointer;
+      transition: border-color 100ms;
+    }
+    .deep-dive-row:hover { border-color: rgba(255,255,255,0.4); }
+    .deep-dive-row.dd-on { border-color: #ffffff; }
+
+    .dd-text { display: flex; flex-direction: column; gap: 3px; }
+    .dd-name { font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: #ffffff; }
+    .dd-sub  { font-size: 9px; color: rgba(255,255,255,0.3); letter-spacing: 0.06em; }
+    .dd-sub.dd-on { color: rgba(255,255,255,0.6); }
+
+    .dd-switch { position: relative; width: 38px; height: 20px; flex-shrink: 0; }
+    .dd-switch input { display: none; }
+    .dd-track {
+      position: absolute; inset: 0;
+      background: #111;
+      border: 1px solid rgba(255,255,255,0.2);
+    }
+    .dd-knob {
+      position: absolute; top: 3px; left: 3px;
+      width: 12px; height: 12px;
+      background: #333;
+      border-top: 1px solid rgba(255,255,255,0.2);
+      transition: left 80ms, background 80ms;
+    }
+    .dd-switch input:checked ~ .dd-track { border-color: rgba(255,255,255,0.8); }
+    .dd-switch input:checked ~ .dd-track .dd-knob {
+      left: 21px; background: #ffffff;
+    }
   </style>
 </head>
 <body>
   <div class="card">
     <div class="title">Gutter // Settings</div>
+
+    <!-- Deep Dive toggle — always visible -->
+    <label class="deep-dive-row" id="dd-row">
+      <div class="dd-text">
+        <span class="dd-name">Deep Dive Mode</span>
+        <span class="dd-sub" id="dd-sub">Off — standard two-sentence reply</span>
+      </div>
+      <div class="dd-switch">
+        <input type="checkbox" id="dd-toggle">
+        <div class="dd-track"><div class="dd-knob"></div></div>
+      </div>
+    </label>
 
     <!-- Logged out -->
     <div id="logged-out">

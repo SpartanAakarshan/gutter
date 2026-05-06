@@ -9,6 +9,26 @@ const userEmailEl   = document.getElementById('user-email');
 const keyConfigured = document.getElementById('key-configured');
 const keyMissing    = document.getElementById('key-missing');
 
+// Deep Dive toggle
+const ddToggle = document.getElementById('dd-toggle');
+const ddRow    = document.getElementById('dd-row');
+const ddSub    = document.getElementById('dd-sub');
+
+function applyDeepDive(on) {
+  ddToggle.checked  = on;
+  ddRow.className   = on ? 'deep-dive-row dd-on' : 'deep-dive-row';
+  ddSub.textContent = on ? 'On — replies scoped to this page' : 'Off — standard two-sentence reply';
+  ddSub.className   = on ? 'dd-sub dd-on' : 'dd-sub';
+}
+
+chrome.storage.local.get('deepDive').then(({ deepDive }) => applyDeepDive(!!deepDive));
+
+ddToggle.addEventListener('change', () => {
+  const on = ddToggle.checked;
+  chrome.storage.local.set({ deepDive: on });
+  applyDeepDive(on);
+});
+
 function showStatus(msg, isError = false) {
   statusEl.textContent = msg;
   statusEl.className = isError ? 'err' : 'ok';

@@ -14,55 +14,137 @@ function showStatus(msg, isError = false) {
   statusEl.className = isError ? 'err' : 'ok';
 }
 
+const PROVIDER_LABELS = {
+  gemini: 'Gemini (Google)',
+  openai: 'OpenAI',
+  claude: 'Claude (Anthropic)',
+  grok:   'Grok (xAI)'
+};
+
 async function checkSession() {
-  const { token, email, hasKey } = await chrome.storage.local.get(['token', 'email', 'hasKey']);
+  const { token, email, hasKey, activeProvider } = await chrome.storage.local.get(['token', 'email', 'hasKey', 'activeProvider']);
   if (!token) {
     loggedOutEl.style.display = 'block';
     loggedInEl.style.display  = 'none';
     return;
   }
-  loggedOutEl.style.display = 'none';
-  loggedInEl.style.display  = 'block';
-  userEmailEl.textContent   = email ?? '';
+  loggedOutEl.style.display   = 'none';
+  loggedInEl.style.display    = 'block';
+  userEmailEl.textContent     = email ?? '';
   keyConfigured.style.display = hasKey ? 'block' : 'none';
   keyMissing.style.display    = hasKey ? 'none'  : 'block';
+  if (hasKey && activeProvider) {
+    document.getElementById('key-status-text').textContent =
+      `${PROVIDER_LABELS[activeProvider] ?? activeProvider} key configured`;
+  }
 }
 
-document.getElementById('btn-google').addEventListener('click', () => {
-  showStatus('Opening sign-in…');
+async function generateCodeVerifier() {
+  const array = new Uint8Array(32);
+  crypto.getRandomValues(array);
+  return btoa(String.fromCharCode(...array))
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+}
 
-  const redirectURL = chrome.identity.getRedirectURL();
-  const oauthURL    = `${SUPABASE_URL}/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(redirectURL)}`;
+async function generateCodeChallenge(verifier) {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier));
+  return btoa(String.fromCharCode(...new Uint8Array(digest)))
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+}
 
-  chrome.identity.launchWebAuthFlow({ url: oauthURL, interactive: true }, async (redirectUrl) => {
-    if (chrome.runtime.lastError || !redirectUrl) {
-      showStatus('Sign in cancelled or failed.', true);
-      return;
-    }
+async function fetchWithTimeout(url, options, ms = 8000) {
+  const ctrl = new AbortController();
+  const id = setTimeout(() => ctrl.abort(), ms);
+  return fetch(url, { ...options, signal: ctrl.signal }).finally(() => clearTimeout(id));
+}
 
-    const hash         = new URL(redirectUrl).hash.substring(1);
-    const params       = new URLSearchParams(hash);
-    const token        = params.get('access_token');
-    const refreshToken = params.get('refresh_token');
-
-    if (!token) {
-      showStatus('No token received. Try again.', true);
-      return;
-    }
-
-    const userRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+async function handleTokens(token, refreshToken) {
+  let email = '';
+  try {
+    const userRes = await fetchWithTimeout(`${SUPABASE_URL}/auth/v1/user`, {
       headers: { 'Authorization': `Bearer ${token}`, 'apikey': SUPABASE_ANON }
     });
-    const user = await userRes.json();
+    if (userRes.ok) {
+      const user = await userRes.json();
+      email = user.email ?? '';
+    }
+  } catch {}
+  await chrome.storage.local.set({ token, refreshToken, email, hasKey: false });
+  showStatus('Signed in.');
+  checkSession();
+}
 
-    await chrome.storage.local.set({ token, refreshToken, email: user.email, hasKey: false });
-    showStatus('Signed in.');
-    checkSession();
+document.getElementById('btn-google').addEventListener('click', async () => {
+  showStatus('Opening sign-in…');
+
+  const redirectURL   = chrome.identity.getRedirectURL();
+  const codeVerifier  = await generateCodeVerifier();
+  const codeChallenge = await generateCodeChallenge(codeVerifier);
+
+  await chrome.storage.local.set({ pkce_verifier: codeVerifier });
+
+  const oauthURL = `${SUPABASE_URL}/auth/v1/authorize?` + new URLSearchParams({
+    provider:              'google',
+    redirect_to:           redirectURL,
+    code_challenge:        codeChallenge,
+    code_challenge_method: 'S256'
+  });
+
+  chrome.identity.launchWebAuthFlow({ url: oauthURL, interactive: true }, async (redirectUrl) => {
+    try {
+      if (chrome.runtime.lastError || !redirectUrl) {
+        showStatus('Sign in cancelled or failed.', true);
+        return;
+      }
+
+      const url  = new URL(redirectUrl);
+      const code = url.searchParams.get('code');
+
+      if (!code) {
+        showStatus('No auth code received. Try again.', true);
+        return;
+      }
+
+      const { pkce_verifier } = await chrome.storage.local.get('pkce_verifier');
+      await chrome.storage.local.remove('pkce_verifier');
+
+      const res  = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=pkce`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON },
+        body:    JSON.stringify({ auth_code: code, code_verifier: pkce_verifier })
+      });
+      const data = await res.json();
+
+      if (!data.access_token) {
+        showStatus(data.error_description ?? data.message ?? data.error ?? 'Token exchange failed.', true);
+        return;
+      }
+
+      await handleTokens(data.access_token, data.refresh_token);
+    } catch (err) {
+      showStatus('Error: ' + err.message, true);
+    }
   });
 });
 
+const PLACEHOLDERS = {
+  gemini: 'AIzaSy...',
+  openai: 'sk-...',
+  claude: 'sk-ant-...',
+  grok:   'xai-...'
+};
+
+const providerEl = document.getElementById('provider');
+const apiKeyEl   = document.getElementById('api-key');
+
+providerEl.addEventListener('change', () => {
+  apiKeyEl.placeholder = PLACEHOLDERS[providerEl.value] ?? '';
+});
+
 document.getElementById('btn-save-key').addEventListener('click', async () => {
-  const apiKey = document.getElementById('api-key').value.trim();
+  const apiKey   = apiKeyEl.value.trim();
+  const provider = providerEl.value;
+
   if (!apiKey || apiKey.length < 10) {
     showStatus('Enter a valid API key.', true);
     return;
@@ -73,17 +155,17 @@ document.getElementById('btn-save-key').addEventListener('click', async () => {
   showStatus('Saving…');
 
   const { token } = await chrome.storage.local.get('token');
-  const res  = await fetch(`${API_BASE}/keys`, {
+  const res  = await fetchWithTimeout(`${API_BASE}/keys`, {
     method:  'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-    body:    JSON.stringify({ apiKey, provider: 'gemini' })
+    body:    JSON.stringify({ apiKey, provider })
   });
   const data = await res.json();
   btn.disabled = false;
 
   if (data.success) {
-    await chrome.storage.local.set({ hasKey: true });
-    document.getElementById('api-key').value = '';
+    await chrome.storage.local.set({ hasKey: true, activeProvider: data.provider });
+    apiKeyEl.value = '';
     showStatus('API key saved.');
     checkSession();
   } else {
@@ -96,14 +178,14 @@ document.getElementById('btn-remove-key').addEventListener('click', async () => 
 
   showStatus('Removing…');
   const { token } = await chrome.storage.local.get('token');
-  const res  = await fetch(`${API_BASE}/keys`, {
+  const res  = await fetchWithTimeout(`${API_BASE}/keys`, {
     method:  'DELETE',
     headers: { 'Authorization': `Bearer ${token}` }
   });
   const data = await res.json();
 
   if (data.success) {
-    await chrome.storage.local.set({ hasKey: false });
+    await chrome.storage.local.set({ hasKey: false, activeProvider: null });
     showStatus('Key removed.');
     checkSession();
   } else {
@@ -112,7 +194,7 @@ document.getElementById('btn-remove-key').addEventListener('click', async () => 
 });
 
 document.getElementById('btn-logout').addEventListener('click', async () => {
-  await chrome.storage.local.remove(['token', 'email', 'refreshToken', 'hasKey']);
+  await chrome.storage.local.remove(['token', 'email', 'refreshToken', 'hasKey', 'pkce_verifier', 'activeProvider']);
   showStatus('Logged out.');
   checkSession();
 });

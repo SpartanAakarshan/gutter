@@ -8,8 +8,8 @@
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      background: #03030f;
-      color: #b8b8ff;
+      background: #000000;
+      color: #ffffff;
       font-family: 'Courier New', Courier, monospace;
       min-height: 100vh;
       display: flex;
@@ -21,18 +21,18 @@
     .card {
       width: 100%;
       max-width: 360px;
-      border: 1px solid #4a4aff;
+      border: 1px solid rgba(255,255,255,0.15);
       padding: 28px;
-      box-shadow: 0 0 16px rgba(80,80,255,0.3), 0 0 40px rgba(50,50,200,0.1);
+      box-shadow: 0 4px 24px rgba(0,0,0,0.8);
     }
 
     .title {
       font-size: 11px;
       letter-spacing: 0.25em;
-      color: #6666ff;
+      color: rgba(255,255,255,0.35);
       text-transform: uppercase;
       margin-bottom: 24px;
-      border-bottom: 1px solid #1e1e6e;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
       padding-bottom: 12px;
     }
 
@@ -40,7 +40,7 @@
       display: block;
       font-size: 10px;
       letter-spacing: 0.15em;
-      color: #5555cc;
+      color: rgba(255,255,255,0.35);
       text-transform: uppercase;
       margin-bottom: 6px;
       margin-top: 16px;
@@ -48,23 +48,37 @@
 
     input {
       width: 100%;
-      background: #000008;
-      border: 1px solid #2a2a88;
-      color: #b8b8ff;
+      background: #000000;
+      border: 1px solid rgba(255,255,255,0.2);
+      color: #ffffff;
       font-family: 'Courier New', Courier, monospace;
       font-size: 12px;
       padding: 8px 10px;
       outline: none;
     }
-    input:focus { border-color: #4a4aff; }
+    input:focus { border-color: rgba(255,255,255,0.6); }
+
+    select {
+      width: 100%;
+      background: #000000;
+      border: 1px solid rgba(255,255,255,0.2);
+      color: #ffffff;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 12px;
+      padding: 8px 10px;
+      outline: none;
+      appearance: none;
+      cursor: pointer;
+    }
+    select:focus { border-color: rgba(255,255,255,0.6); }
 
     .btn-row { display: flex; gap: 10px; margin-top: 16px; }
 
     button {
       flex: 1;
       background: none;
-      border: 1px solid #4a4aff;
-      color: #6666ff;
+      border: 1px solid rgba(255,255,255,0.25);
+      color: rgba(255,255,255,0.6);
       font-family: 'Courier New', Courier, monospace;
       font-size: 11px;
       letter-spacing: 0.1em;
@@ -72,12 +86,12 @@
       padding: 9px;
       cursor: pointer;
     }
-    button:hover { background: #111144; color: #ffffff; }
-    button.primary { background: #1a1a6e; color: #b8b8ff; border-color: #6666ff; }
-    button.primary:hover { background: #2a2a99; }
-    button.danger { border-color: #aa2222; color: #cc4444; }
-    button.danger:hover { background: #2a0808; }
-    button:disabled { opacity: 0.4; cursor: not-allowed; }
+    button:hover { background: rgba(255,255,255,0.06); color: #ffffff; border-color: rgba(255,255,255,0.5); }
+    button.primary { background: rgba(255,255,255,0.08); color: #ffffff; border-color: rgba(255,255,255,0.4); }
+    button.primary:hover { background: rgba(255,255,255,0.14); }
+    button.danger { border-color: rgba(255,80,80,0.4); color: rgba(255,100,100,0.8); }
+    button.danger:hover { background: rgba(255,50,50,0.08); color: #ff8080; border-color: rgba(255,80,80,0.7); }
+    button:disabled { opacity: 0.3; cursor: not-allowed; }
 
     .google-btn {
       width: 100%;
@@ -85,9 +99,9 @@
       align-items: center;
       justify-content: center;
       gap: 10px;
-      background: #0f0f2e;
-      border: 1px solid #4a4aff;
-      color: #b8b8ff;
+      background: none;
+      border: 1px solid rgba(255,255,255,0.25);
+      color: rgba(255,255,255,0.8);
       font-family: 'Courier New', Courier, monospace;
       font-size: 11px;
       letter-spacing: 0.1em;
@@ -95,7 +109,7 @@
       padding: 11px;
       cursor: pointer;
     }
-    .google-btn:hover { background: #1a1a55; }
+    .google-btn:hover { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.5); color: #ffffff; }
 
     .google-icon { width: 16px; height: 16px; }
 
@@ -105,12 +119,12 @@
       min-height: 16px;
       letter-spacing: 0.05em;
     }
-    .ok  { color: #44aa44; }
-    .err { color: #cc4444; }
+    .ok  { color: rgba(100,255,100,0.8); }
+    .err { color: rgba(255,100,100,0.8); }
 
     .user-email {
       font-size: 11px;
-      color: #5555cc;
+      color: rgba(255,255,255,0.4);
       margin-bottom: 20px;
       letter-spacing: 0.05em;
       word-break: break-all;
@@ -118,7 +132,7 @@
 
     .key-status {
       font-size: 11px;
-      color: #44aa44;
+      color: rgba(100,255,100,0.8);
       margin-bottom: 12px;
       display: flex;
       align-items: center;
@@ -128,7 +142,7 @@
 
     .divider {
       border: none;
-      border-top: 1px solid #1e1e6e;
+      border-top: 1px solid rgba(255,255,255,0.1);
       margin: 20px 0;
     }
 
@@ -159,7 +173,7 @@
 
       <!-- Key configured -->
       <div id="key-configured" style="display:none">
-        <div class="key-status">Gemini API key configured</div>
+        <div class="key-status" id="key-status-text">API key configured</div>
         <div class="btn-row">
           <button class="danger" id="btn-remove-key">Remove Key</button>
         </div>
@@ -167,7 +181,14 @@
 
       <!-- No key yet -->
       <div id="key-missing">
-        <label>Gemini API Key</label>
+        <label>AI Provider</label>
+        <select id="provider">
+          <option value="gemini">Gemini (Google)</option>
+          <option value="openai">OpenAI</option>
+          <option value="claude">Claude (Anthropic)</option>
+          <option value="grok">Grok (xAI)</option>
+        </select>
+        <label>API Key</label>
         <input type="password" id="api-key" placeholder="AIzaSy..." autocomplete="off" />
         <div class="btn-row">
           <button class="primary" id="btn-save-key">Save Key</button>

@@ -2,17 +2,69 @@ const PROXY_URL    = 'https://gutter-api.vercel.app/api/explain';
 const REFRESH_URL  = 'https://zwetyinnzamzmsvnraax.supabase.co/auth/v1/token?grant_type=refresh_token';
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp3ZXR5aW5uemFtem1zdm5yYWF4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4NzQwNjAsImV4cCI6MjA5MzQ1MDA2MH0.hFjRaqJ-y3cbyKu5Jw6IzREfOBRKOpFynuaxinuJyJM';
 
+const CACHE_MAX   = 5;
+const LOCAL_LIMIT = 20;
+
+function normKey(text) {
+  return text.trim().toLowerCase().slice(0, 100);
+}
+
+async function getCached(text) {
+  const { summaryCache = [] } = await chrome.storage.local.get('summaryCache');
+  const entry = summaryCache.find(e => e.k === normKey(text));
+  if (!entry) return null;
+  if (Date.now() - entry.t > 86400000) return null;
+  return entry.r;
+}
+
+async function storeCached(text, result) {
+  const { summaryCache = [] } = await chrome.storage.local.get('summaryCache');
+  const key = normKey(text);
+  const filtered = summaryCache.filter(e => e.k !== key);
+  filtered.unshift({ k: key, r: result, t: Date.now() });
+  await chrome.storage.local.set({ summaryCache: filtered.slice(0, CACHE_MAX) });
+}
+
+async function checkLocalLimit() {
+  const { hasKey } = await chrome.storage.local.get('hasKey');
+  if (hasKey) return true;
+  const today = new Date().toISOString().slice(0, 10);
+  const { localUsage = { date: '', count: 0 } } = await chrome.storage.local.get('localUsage');
+  if (localUsage.date !== today) return true;
+  return localUsage.count < LOCAL_LIMIT;
+}
+
+async function incrementLocalCount() {
+  const { hasKey } = await chrome.storage.local.get('hasKey');
+  if (hasKey) return;
+  const today = new Date().toISOString().slice(0, 10);
+  const { localUsage = { date: '', count: 0 } } = await chrome.storage.local.get('localUsage');
+  const count = localUsage.date === today ? localUsage.count + 1 : 1;
+  await chrome.storage.local.set({ localUsage: { date: today, count } });
+}
+
 async function refreshToken() {
   const { refreshToken } = await chrome.storage.local.get('refreshToken');
   if (!refreshToken) return null;
 
-  const r = await fetch(REFRESH_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON },
-    body: JSON.stringify({ refresh_token: refreshToken })
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 10000);
 
-  const data = await r.json();
+  let r;
+  try {
+    r = await fetch(REFRESH_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON },
+      body: JSON.stringify({ refresh_token: refreshToken }),
+      signal: controller.signal
+    });
+  } catch {
+    clearTimeout(timer);
+    return null;
+  }
+  clearTimeout(timer);
+
+  const data = await r.json().catch(() => ({}));
   if (!data.access_token) return null;
 
   await chrome.storage.local.set({
@@ -73,13 +125,34 @@ chrome.runtime.onMessage.addListener((message, sender) => {
   const tabId = sender.tab?.id;
   if (!tabId) return;
 
-  callProxy(message.text)
-    .then(data => {
+  (async () => {
+    const cached = await getCached(message.text);
+    if (cached) {
+      chrome.tabs.sendMessage(tabId, { action: 'result', result: cached }).catch(() => {});
+      return;
+    }
+
+    const allowed = await checkLocalLimit();
+    if (!allowed) {
+      chrome.tabs.sendMessage(tabId, {
+        action: 'result',
+        error: 'NO_API_KEY',
+        message: "You've hit the daily limit. Add your API key in options — it's free to get one."
+      }).catch(() => {});
+      return;
+    }
+
+    try {
+      const data = await callProxy(message.text);
       if (data.result) {
-        chrome.tabs.sendMessage(tabId, { action: 'result', result: data.result, remaining: data.remaining ?? null });
+        await storeCached(message.text, data.result);
+        await incrementLocalCount();
+        chrome.tabs.sendMessage(tabId, { action: 'result', result: data.result, remaining: data.remaining ?? null }).catch(() => {});
       } else {
-        chrome.tabs.sendMessage(tabId, { action: 'result', error: data.error ?? 'No response.', message: data.message });
+        chrome.tabs.sendMessage(tabId, { action: 'result', error: data.error ?? 'No response.', message: data.message }).catch(() => {});
       }
-    })
-    .catch(err => chrome.tabs.sendMessage(tabId, { action: 'result', error: err.message }));
+    } catch (err) {
+      chrome.tabs.sendMessage(tabId, { action: 'result', error: err.message }).catch(() => {});
+    }
+  })();
 });

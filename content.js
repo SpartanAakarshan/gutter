@@ -12,38 +12,34 @@ function buildTooltip() {
   const style = document.createElement('style');
   style.textContent = `
     .box {
-      background: #03030f;
-      color: #b8b8ff;
-      border: 1px solid #4a4aff;
+      background: #000000;
+      color: #ffffff;
+      border: 1px solid rgba(255,255,255,0.75);
       border-radius: 2px;
       padding: 14px 16px;
       max-width: 300px;
       font-family: 'Courier New', Courier, monospace;
       font-size: 12px;
       line-height: 1.7;
-      box-shadow:
-        0 0 0 1px #1a1a6e,
-        0 0 16px rgba(80, 80, 255, 0.35),
-        0 0 40px rgba(50, 50, 200, 0.12),
-        inset 0 0 20px rgba(0, 0, 40, 0.6);
+      box-shadow: 0 4px 24px rgba(0,0,0,0.9);
       pointer-events: auto;
       letter-spacing: 0.03em;
     }
     .label {
       font-size: 10px;
-      color: #6666ff;
+      color: rgba(255,255,255,0.35);
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.25em;
       margin-bottom: 8px;
       padding-bottom: 6px;
-      border-bottom: 1px solid #1e1e6e;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
     }
     .close {
       float: right;
       background: none;
-      border: 1px solid #3333aa;
-      color: #5555cc;
+      border: 1px solid rgba(255,255,255,0.2);
+      color: rgba(255,255,255,0.35);
       cursor: pointer;
       font-family: 'Courier New', Courier, monospace;
       font-size: 11px;
@@ -54,16 +50,16 @@ function buildTooltip() {
     }
     .close:hover {
       color: #ffffff;
-      background: #2222aa;
-      border-color: #8888ff;
+      background: rgba(255,255,255,0.08);
+      border-color: rgba(255,255,255,0.5);
     }
     .loading {
-      color: #3a3a99;
+      color: rgba(255,255,255,0.35);
       animation: cp-pulse 1.2s step-end infinite;
     }
     @keyframes cp-pulse {
       0%, 100% { opacity: 1; }
-      50% { opacity: 0.4; }
+      50% { opacity: 0.3; }
     }
   `;
 
@@ -102,7 +98,7 @@ function showLoading() {
 
   const loading = document.createElement('span');
   loading.className = 'loading';
-  loading.textContent = 'Finding…';
+  loading.textContent = 'Pulling context…';
 
   tooltipBox.innerHTML = '';
   tooltipBox.appendChild(closeBtn);
@@ -165,6 +161,10 @@ function updateUpgrade(message) {
   buildBox('Upgrade Required', message, 'Get unlimited access →', 'https://gutter-api.vercel.app/upgrade');
 }
 
+function updateError(message) {
+  buildBox('Lost Signal', message);
+}
+
 function hide() {
   if (tooltipHost) tooltipHost.style.display = 'none';
 }
@@ -172,10 +172,17 @@ function hide() {
 let pendingTimer = null;
 
 function askGemini(text, x, y) {
+  if (!navigator.onLine) {
+    if (!tooltipHost) buildTooltip();
+    positionTooltip(x, y);
+    tooltipHost.style.display = 'block';
+    updateError('No connection. Check your network and try again.');
+    return;
+  }
   const trimmed = text.slice(0, 2000);
   show(x, y);
   clearTimeout(pendingTimer);
-  pendingTimer = setTimeout(() => update('Timed out. Try again.'), 20000);
+  pendingTimer = setTimeout(() => updateError('Timed out. Try again.'), 20000);
   chrome.runtime.sendMessage({ action: 'explain', text: trimmed });
 }
 
@@ -188,7 +195,7 @@ chrome.runtime.onMessage.addListener((message) => {
   } else if (message.result) {
     update(message.result, message.remaining);
   } else {
-    update('Error: ' + (message.error ?? 'unknown'));
+    updateError(message.error ?? 'Unknown error. Try again.');
   }
 });
 
@@ -204,25 +211,35 @@ function attachHeader(el) {
     e.preventDefault();
     e.stopPropagation();
 
-    const text = el.innerText.trim();
+    const text = el.innerText.trim().slice(0, 100);
     if (!text) return;
-    askGemini(text, e.clientX, e.clientY);
+    setTimeout(() => askGemini(text, e.clientX, e.clientY), 200);
   });
 }
 
 const SELECTOR = 'h1, h2, h3, b, strong';
 
-// Initial scan
-document.querySelectorAll(SELECTOR).forEach(attachHeader);
+function scanRoot(root) {
+  root.querySelectorAll(SELECTOR).forEach(attachHeader);
+  root.querySelectorAll('*').forEach(el => {
+    if (el.shadowRoot) scanRoot(el.shadowRoot);
+  });
+}
 
-// SPA support — catch elements added after load
+function processNode(node) {
+  if (node.nodeType !== 1) return;
+  if (/^(H[123]|B|STRONG)$/.test(node.tagName)) attachHeader(node);
+  node.querySelectorAll?.(SELECTOR).forEach(attachHeader);
+  if (node.shadowRoot) scanRoot(node.shadowRoot);
+}
+
+// Initial scan
+scanRoot(document);
+
+// SPA + Shadow DOM support
 const observer = new MutationObserver((mutations) => {
   for (const { addedNodes } of mutations) {
-    for (const node of addedNodes) {
-      if (node.nodeType !== 1) continue;
-      if (/^(H[123]|B|STRONG)$/.test(node.tagName)) attachHeader(node);
-      node.querySelectorAll?.(SELECTOR).forEach(attachHeader);
-    }
+    for (const node of addedNodes) processNode(node);
   }
 });
 observer.observe(document.documentElement, { childList: true, subtree: true });
@@ -233,7 +250,11 @@ document.addEventListener('click', (e) => {
   const selection = window.getSelection()?.toString().trim();
   if (!selection || selection.length < 10) return;
   e.preventDefault();
-  askGemini(selection, e.clientX, e.clientY);
+  setTimeout(() => askGemini(selection, e.clientX, e.clientY), 200);
 });
 
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') hide(); });
+
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) document.body.classList.remove('gutter-mode');
+});

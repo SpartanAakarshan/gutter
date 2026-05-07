@@ -260,6 +260,18 @@ chrome.storage.local.get(['token', 'deepDive']).then(({ token, deepDive }) => {
   _deepDive = !!deepDive;
 }).catch(() => {});
 
+// Keep _deepDive in sync when toggled from options page or popup
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== 'local') return;
+  if ('deepDive' in changes) {
+    const next = !!changes.deepDive.newValue;
+    if (next !== _deepDive) {
+      _deepDive = next;
+      _metaSent = false; // force re-scrape on next click
+    }
+  }
+});
+
 // Deep Dive: scraped once per page load, only when mode is active
 let _metaSent = false;
 

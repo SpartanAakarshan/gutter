@@ -6,21 +6,21 @@ const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFz
 const CACHE_MAX   = 5;
 const LOCAL_LIMIT = 20;
 
-function normKey(text) {
-  return text.trim().toLowerCase().slice(0, 100);
+function normKey(text, deepDive) {
+  return (deepDive ? 'dd:' : 'std:') + text.trim().toLowerCase().slice(0, 100);
 }
 
-async function getCached(text) {
+async function getCached(text, deepDive) {
   const { summaryCache = [] } = await chrome.storage.local.get('summaryCache');
-  const entry = summaryCache.find(e => e.k === normKey(text));
+  const entry = summaryCache.find(e => e.k === normKey(text, deepDive));
   if (!entry) return null;
   if (Date.now() - entry.t > 86400000) return null;
   return entry.r;
 }
 
-async function storeCached(text, result) {
+async function storeCached(text, result, deepDive) {
   const { summaryCache = [] } = await chrome.storage.local.get('summaryCache');
-  const key = normKey(text);
+  const key = normKey(text, deepDive);
   const filtered = summaryCache.filter(e => e.k !== key);
   filtered.unshift({ k: key, r: result, t: Date.now() });
   await chrome.storage.local.set({ summaryCache: filtered.slice(0, CACHE_MAX) });
@@ -162,7 +162,10 @@ chrome.runtime.onMessage.addListener((message, sender) => {
 
     if (message.meta) await storeSessionMeta(tabId, message.meta);
 
-    const cached = await getCached(message.text);
+    const { deepDive } = await chrome.storage.local.get('deepDive');
+    const isDeepDive = !!deepDive;
+
+    const cached = await getCached(message.text, isDeepDive);
     if (cached) {
       chrome.tabs.sendMessage(tabId, { action: 'result', result: cached }).catch(() => {});
       return;
@@ -178,13 +181,12 @@ chrome.runtime.onMessage.addListener((message, sender) => {
       return;
     }
 
-    const { deepDive } = await chrome.storage.local.get('deepDive');
-    const meta = deepDive ? await getSessionMeta(tabId) : null;
+    const meta = isDeepDive ? await getSessionMeta(tabId) : null;
 
     try {
       const data = await callProxy(message.text, meta);
       if (data.result) {
-        await storeCached(message.text, data.result);
+        await storeCached(message.text, data.result, isDeepDive);
         await incrementLocalCount();
         chrome.tabs.sendMessage(tabId, { action: 'result', result: data.result, remaining: data.remaining ?? null }).catch(() => {});
       } else {

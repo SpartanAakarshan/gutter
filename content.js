@@ -376,10 +376,17 @@ const observer = new MutationObserver((mutations) => {
 });
 observer.observe(document.documentElement, { childList: true, subtree: true });
 
+// Capture selection on mousedown — click event clears it before handler fires
+let _savedSelection = '';
+document.addEventListener('mousedown', (e) => {
+  if (e.altKey) _savedSelection = window.getSelection()?.toString().trim() ?? '';
+});
+
 // Alt+Click on any selected text → explain selection
 document.addEventListener('click', (e) => {
   if (!e.altKey) return;
-  const selection = window.getSelection()?.toString().trim();
+  const selection = _savedSelection || window.getSelection()?.toString().trim();
+  _savedSelection = '';
   if (!selection || selection.length < 10) return;
   e.preventDefault();
   setTimeout(() => askGemini(selection, e.clientX, e.clientY), 200);

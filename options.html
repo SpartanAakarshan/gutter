@@ -190,6 +190,19 @@
   </style>
 </head>
 <body>
+  <div id="consent-banner" style="display:none;position:fixed;inset:0;background:#000;z-index:999;display:flex;align-items:center;justify-content:center;padding:24px;">
+    <div style="max-width:360px;border:1px solid rgba(255,255,255,0.2);padding:28px;font-family:'Courier New',Courier,monospace;">
+      <div style="font-size:11px;letter-spacing:0.25em;color:rgba(255,255,255,0.35);text-transform:uppercase;margin-bottom:20px;padding-bottom:12px;border-bottom:1px solid rgba(255,255,255,0.1);">Gutter // Data Notice</div>
+      <div style="font-size:11px;line-height:1.8;color:rgba(255,255,255,0.7);margin-bottom:20px;">
+        When you Alt+Click text on any page, that text is sent to our server and processed by an AI model to generate a summary. No text is stored beyond the request. Your email is used only for authentication. By continuing, you agree to this.
+      </div>
+      <div style="font-size:10px;color:rgba(255,255,255,0.3);margin-bottom:20px;line-height:1.6;">
+        Third parties: Supabase (auth), Vercel (compute), Google/OpenAI/Anthropic/xAI (AI). You can delete your account at any time from Settings.
+      </div>
+      <button id="consent-btn" style="width:100%;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.4);color:#fff;font-family:'Courier New',Courier,monospace;font-size:11px;letter-spacing:0.1em;text-transform:uppercase;padding:10px;cursor:pointer;">I Understand — Continue</button>
+    </div>
+  </div>
+
   <div class="card">
     <div class="title">Gutter // Settings</div>
 

@@ -3,7 +3,7 @@ const STATUS_URL   = 'https://gutter-api.vercel.app/api/status';
 const REFRESH_URL  = 'https://zwetyinnzamzmsvnraax.supabase.co/auth/v1/token?grant_type=refresh_token';
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp3ZXR5aW5uemFtem1zdm5yYWF4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4NzQwNjAsImV4cCI6MjA5MzQ1MDA2MH0.hFjRaqJ-y3cbyKu5Jw6IzREfOBRKOpFynuaxinuJyJM';
 
-const CACHE_MAX            = 5;
+const CACHE_MAX            = 100;
 const LOCAL_LIMIT          = 20;
 const DEEP_DIVE_TRIAL_MAX  = 10;
 
@@ -56,6 +56,14 @@ async function fetchPlanStatus(token) {
   } catch {}
 }
 
+// Open options page on first install for consent + onboarding
+chrome.runtime.onInstalled.addListener(({ reason }) => {
+  if (reason === 'install') {
+    chrome.storage.local.set({ consentGiven: false });
+    chrome.runtime.openOptionsPage();
+  }
+});
+
 // Fetch plan on startup if token exists
 chrome.storage.local.get('token').then(({ token }) => {
   if (token) fetchPlanStatus(token);
@@ -99,12 +107,12 @@ async function refreshToken() {
   }
   clearTimeout(timer);
 
-  const data = await r.json().catch(() => ({}));
+  const data = await r.json().catch((e) => { console.warn('[gutter] refresh parse failed:', e); return {}; });
   if (!data.access_token) return null;
 
   await chrome.storage.local.set({
     token: data.access_token,
-    refreshToken: data.refresh_token
+    refreshToken: data.refresh_token ?? refreshToken
   });
 
   fetchPlanStatus(data.access_token);
@@ -174,6 +182,7 @@ chrome.runtime.onMessage.addListener((message, sender) => {
 
   const tabId = sender.tab?.id;
   if (!tabId) return;
+  if (sender.frameId !== 0) return; // ignore requests from iframes
 
   (async () => {
     if (typeof message.text !== 'string' || !message.text) return;

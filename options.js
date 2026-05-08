@@ -2,6 +2,17 @@ const SUPABASE_URL  = 'https://zwetyinnzamzmsvnraax.supabase.co';
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp3ZXR5aW5uemFtem1zdm5yYWF4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4NzQwNjAsImV4cCI6MjA5MzQ1MDA2MH0.hFjRaqJ-y3cbyKu5Jw6IzREfOBRKOpFynuaxinuJyJM';
 const API_BASE      = 'https://gutter-api.vercel.app/api';
 
+// First-run consent
+const consentBanner = document.getElementById('consent-banner');
+const consentBtn    = document.getElementById('consent-btn');
+chrome.storage.local.get('consentGiven').then(({ consentGiven }) => {
+  if (!consentGiven) consentBanner.style.display = 'flex';
+});
+consentBtn.addEventListener('click', () => {
+  chrome.storage.local.set({ consentGiven: true });
+  consentBanner.style.display = 'none';
+});
+
 const statusEl      = document.getElementById('status');
 const loggedInEl    = document.getElementById('logged-in');
 const loggedOutEl   = document.getElementById('logged-out');
@@ -135,7 +146,7 @@ async function handleTokens(token, refreshToken) {
       const user = await userRes.json();
       email = user.email ?? '';
     }
-  } catch {}
+  } catch (e) { console.warn('[gutter] user fetch failed:', e); }
   await chrome.storage.local.set({ token, refreshToken, email, hasKey: false });
 
   try {
@@ -146,7 +157,7 @@ async function handleTokens(token, refreshToken) {
       const { isPro } = await statusRes.json();
       await chrome.storage.local.set({ isPro: !!isPro });
     }
-  } catch {}
+  } catch (e) { console.warn('[gutter] status fetch failed:', e); }
 
   showStatus('Signed in.');
   checkSession();

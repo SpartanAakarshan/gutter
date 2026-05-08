@@ -3,7 +3,7 @@
   "name": "Gutter",
   "version": "1.0",
   "description": "Context without clutter. Alt+Click any heading for instant context — no new tabs, no rabbit holes.",
-  "permissions": ["activeTab", "storage", "identity", "scripting", "tabs"],
+  "permissions": ["storage", "identity", "scripting", "tabs"],
   "options_page": "options.html",
   "icons": { "16": "icon16.png", "48": "icon48.png", "128": "icon128.png" },
   "action": {
@@ -22,7 +22,6 @@
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "all_frames": true,
       "js": ["content.js"],
       "css": ["styles.css"]
     }

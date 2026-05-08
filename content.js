@@ -257,6 +257,7 @@ function buildBox(labelText, bodyText, footerText = null, footerHref = null) {
       const a = document.createElement('a');
       a.href = footerHref;
       a.target = '_blank';
+      a.rel = 'noopener noreferrer';
       a.textContent = footerText;
       a.style.cssText = 'color:#6666ff;text-decoration:none;';
       footer.appendChild(a);
@@ -281,9 +282,10 @@ chrome.storage.local.get(['token', 'deepDive']).then(({ token, deepDive }) => {
   _deepDive = !!deepDive;
 }).catch(() => {});
 
-// Keep _deepDive in sync when toggled from options page or popup
+// Keep in-memory state in sync with storage changes
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area !== 'local') return;
+  if ('token' in changes) _sessionToken = changes.token.newValue ?? null;
   if ('deepDive' in changes) {
     const next = !!changes.deepDive.newValue;
     if (next !== _deepDive) {
@@ -312,8 +314,7 @@ function scrapePageMetadata() {
 }
 
 function upgradeURL() {
-  const base = 'https://gutter-api.vercel.app/upgrade';
-  return _sessionToken ? `${base}?t=${encodeURIComponent(_sessionToken)}` : base;
+  return 'https://gutter-api.vercel.app/upgrade';
 }
 
 function updateUpgrade(message) {

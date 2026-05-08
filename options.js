@@ -14,34 +14,56 @@ const ddToggle = document.getElementById('dd-toggle');
 const ddRow    = document.getElementById('dd-row');
 const ddSub    = document.getElementById('dd-sub');
 const ddLock   = document.getElementById('dd-lock');
+const ddTrial  = document.getElementById('dd-trial');
 
-function applyDeepDive(on, isPro) {
-  if (!isPro) {
+const TRIAL_MAX = 10;
+
+function applyDeepDive(on, isPro, trialUsed = 0) {
+  const trialLeft = Math.max(0, TRIAL_MAX - trialUsed);
+  const trialDone = !isPro && trialLeft === 0;
+
+  if (trialDone) {
     ddToggle.disabled = true;
     ddToggle.checked  = false;
     ddRow.className   = 'deep-dive-row dd-locked';
-    ddSub.textContent = 'Pro feature — upgrade to unlock';
+    ddSub.textContent = 'Trial ended — upgrade for unlimited';
     ddSub.className   = 'dd-sub';
     ddLock.style.display = 'inline';
+    ddTrial.style.display = 'block';
+    ddTrial.textContent = `${TRIAL_MAX} / ${TRIAL_MAX} trials used`;
     return;
   }
+
+  if (!isPro) {
+    ddToggle.disabled = false;
+    ddLock.style.display = 'none';
+    ddToggle.checked  = on;
+    ddRow.className   = on ? 'deep-dive-row dd-on' : 'deep-dive-row';
+    ddSub.textContent = on ? 'On — replies scoped to this page' : 'Off — standard two-sentence reply';
+    ddSub.className   = on ? 'dd-sub dd-on' : 'dd-sub';
+    ddTrial.style.display = 'block';
+    ddTrial.textContent = `${trialUsed} / ${TRIAL_MAX} trial uses — upgrade for unlimited`;
+    return;
+  }
+
   ddToggle.disabled = false;
   ddLock.style.display = 'none';
   ddToggle.checked  = on;
   ddRow.className   = on ? 'deep-dive-row dd-on' : 'deep-dive-row';
   ddSub.textContent = on ? 'On — replies scoped to this page' : 'Off — standard two-sentence reply';
   ddSub.className   = on ? 'dd-sub dd-on' : 'dd-sub';
+  ddTrial.style.display = 'none';
 }
 
-chrome.storage.local.get(['deepDive', 'isPro']).then(({ deepDive, isPro }) => {
-  applyDeepDive(!!deepDive, !!isPro);
+chrome.storage.local.get(['deepDive', 'isPro', 'deepDiveTrialUsed']).then(({ deepDive, isPro, deepDiveTrialUsed }) => {
+  applyDeepDive(!!deepDive, !!isPro, deepDiveTrialUsed ?? 0);
 });
 
 ddRow.addEventListener('click', (e) => {
-  chrome.storage.local.get('isPro').then(({ isPro }) => {
-    if (!isPro) {
+  chrome.storage.local.get(['isPro', 'deepDiveTrialUsed']).then(({ isPro, deepDiveTrialUsed = 0 }) => {
+    const trialDone = !isPro && deepDiveTrialUsed >= TRIAL_MAX;
+    if (trialDone) {
       chrome.tabs.create({ url: 'https://gutter-api.vercel.app/upgrade' });
-      return;
     }
   });
 });
@@ -49,7 +71,9 @@ ddRow.addEventListener('click', (e) => {
 ddToggle.addEventListener('change', () => {
   const on = ddToggle.checked;
   chrome.storage.local.set({ deepDive: on });
-  chrome.storage.local.get('isPro').then(({ isPro }) => applyDeepDive(on, !!isPro));
+  chrome.storage.local.get(['isPro', 'deepDiveTrialUsed']).then(({ isPro, deepDiveTrialUsed }) => {
+    applyDeepDive(on, !!isPro, deepDiveTrialUsed ?? 0);
+  });
 });
 
 function showStatus(msg, isError = false) {

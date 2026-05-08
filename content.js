@@ -5,8 +5,15 @@ let tooltipBox = null;
 // ── Deep Dive floating widget ────────────────────────────────────────────────
 let _widgetHost = null;
 
-function buildWidget(isPro, deepDiveOn) {
+const DEEP_DIVE_TRIAL_MAX = 10;
+
+function buildWidget(isPro, deepDiveOn, trialUsed = 0) {
   if (_widgetHost) _widgetHost.remove();
+
+  const trialLeft = Math.max(0, DEEP_DIVE_TRIAL_MAX - trialUsed);
+  const trialActive = !isPro && trialLeft > 0;
+  const trialDone   = !isPro && trialLeft === 0;
+  const activeOn    = deepDiveOn && (isPro || trialActive);
 
   const host = document.createElement('div');
   host.id = 'gutter-widget';
@@ -20,13 +27,13 @@ function buildWidget(isPro, deepDiveOn) {
       align-items: center;
       gap: 8px;
       background: #000000;
-      border: 1px solid ${deepDiveOn ? 'rgba(255,255,255,0.75)' : 'rgba(255,255,255,0.18)'};
+      border: 1px solid ${activeOn ? 'rgba(255,255,255,0.75)' : 'rgba(255,255,255,0.18)'};
       padding: 5px 10px 5px 8px;
       font-family: 'Courier New', Courier, monospace;
       font-size: 9px;
       letter-spacing: 0.15em;
       text-transform: uppercase;
-      color: ${deepDiveOn ? '#ffffff' : 'rgba(255,255,255,0.35)'};
+      color: ${activeOn ? '#ffffff' : 'rgba(255,255,255,0.35)'};
       cursor: pointer;
       user-select: none;
       transition: border-color 100ms, color 100ms;
@@ -38,10 +45,10 @@ function buildWidget(isPro, deepDiveOn) {
     }
     .dot {
       width: 5px; height: 5px;
-      background: ${deepDiveOn ? '#ffffff' : 'rgba(255,255,255,0.2)'};
+      background: ${activeOn ? '#ffffff' : 'rgba(255,255,255,0.2)'};
       border-radius: 50%;
       flex-shrink: 0;
-      ${deepDiveOn ? 'animation: pulse 1.4s ease-in-out infinite;' : ''}
+      ${activeOn ? 'animation: pulse 1.4s ease-in-out infinite;' : ''}
     }
     @keyframes pulse {
       0%, 100% { opacity: 1; }
@@ -58,18 +65,32 @@ function buildWidget(isPro, deepDiveOn) {
 
   const label = document.createElement('span');
 
-  if (!isPro) {
+  if (trialDone) {
+    // Trial exhausted — upgrade only
     label.textContent = 'Deep Dive';
     const lock = document.createElement('span');
     lock.className = 'lock';
-    lock.textContent = '⊘ Pro';
+    lock.textContent = '⊘ Upgrade';
     btn.appendChild(dot);
     btn.appendChild(label);
     btn.appendChild(lock);
     btn.addEventListener('click', () => {
       window.open('https://gutter-api.vercel.app/upgrade', '_blank');
     });
+  } else if (trialActive) {
+    // Trial available — toggle works, show count
+    label.textContent = deepDiveOn ? `Deep Dive: On (${trialLeft} left)` : `Deep Dive (${trialLeft} left)`;
+    btn.appendChild(dot);
+    btn.appendChild(label);
+    btn.addEventListener('click', () => {
+      const next = !_deepDive;
+      _deepDive = next;
+      _metaSent = false;
+      chrome.storage.local.set({ deepDive: next });
+      buildWidget(false, next, trialUsed);
+    });
   } else {
+    // Pro — full toggle
     label.textContent = deepDiveOn ? 'Deep Dive: On' : 'Deep Dive: Off';
     btn.appendChild(dot);
     btn.appendChild(label);
@@ -78,7 +99,7 @@ function buildWidget(isPro, deepDiveOn) {
       _deepDive = next;
       _metaSent = false;
       chrome.storage.local.set({ deepDive: next });
-      buildWidget(true, next);
+      buildWidget(true, next, trialUsed);
     });
   }
 
@@ -89,9 +110,9 @@ function buildWidget(isPro, deepDiveOn) {
 }
 
 function initWidget() {
-  chrome.storage.local.get(['isPro', 'deepDive', 'token']).then(({ isPro, deepDive, token }) => {
+  chrome.storage.local.get(['isPro', 'deepDive', 'token', 'deepDiveTrialUsed']).then(({ isPro, deepDive, token, deepDiveTrialUsed }) => {
     if (!token) return;
-    buildWidget(!!isPro, !!deepDive);
+    buildWidget(!!isPro, !!deepDive, deepDiveTrialUsed ?? 0);
   }).catch(() => {});
 }
 
@@ -248,7 +269,7 @@ function buildBox(labelText, bodyText, footerText = null, footerHref = null) {
 
 function update(text, remaining = null) {
   const footer = remaining !== null && remaining <= 3
-    ? `${remaining} free search${remaining === 1 ? '' : 'es'} left — upgrade for $5/mo`
+    ? `${remaining} free search${remaining === 1 ? '' : 'es'} left — upgrade for ₹200/month`
     : null;
   buildBox('Gutter', text, footer);
 }
@@ -269,6 +290,11 @@ chrome.storage.onChanged.addListener((changes, area) => {
       _deepDive = next;
       _metaSent = false; // force re-scrape on next click
     }
+  }
+  if ('deepDiveTrialUsed' in changes || 'isPro' in changes) {
+    chrome.storage.local.get(['isPro', 'deepDive', 'deepDiveTrialUsed']).then(({ isPro, deepDive, deepDiveTrialUsed }) => {
+      buildWidget(!!isPro, !!deepDive, deepDiveTrialUsed ?? 0);
+    }).catch(() => {});
   }
 });
 
@@ -299,6 +325,7 @@ function updateError(message) {
 }
 
 function hide() {
+  clearTimeout(pendingTimer);
   if (tooltipHost) tooltipHost.style.display = 'none';
 }
 
@@ -405,6 +432,18 @@ document.addEventListener('click', (e) => {
 });
 
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') hide(); });
+
+// SPA navigation: hide tooltip on route changes
+(function patchHistory() {
+  const wrap = (fn) => function (...args) {
+    const r = fn.apply(this, args);
+    hide();
+    return r;
+  };
+  history.pushState    = wrap(history.pushState);
+  history.replaceState = wrap(history.replaceState);
+})();
+window.addEventListener('popstate', hide);
 
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) document.body.classList.remove('gutter-mode');

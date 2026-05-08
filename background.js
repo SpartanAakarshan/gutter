@@ -3,8 +3,9 @@ const STATUS_URL   = 'https://gutter-api.vercel.app/api/status';
 const REFRESH_URL  = 'https://zwetyinnzamzmsvnraax.supabase.co/auth/v1/token?grant_type=refresh_token';
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp3ZXR5aW5uemFtem1zdm5yYWF4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc4NzQwNjAsImV4cCI6MjA5MzQ1MDA2MH0.hFjRaqJ-y3cbyKu5Jw6IzREfOBRKOpFynuaxinuJyJM';
 
-const CACHE_MAX   = 5;
-const LOCAL_LIMIT = 20;
+const CACHE_MAX            = 5;
+const LOCAL_LIMIT          = 20;
+const DEEP_DIVE_TRIAL_MAX  = 10;
 
 function normKey(text, deepDive) {
   return (deepDive ? 'dd:' : 'std:') + text.trim().toLowerCase().slice(0, 100);
@@ -59,6 +60,23 @@ async function fetchPlanStatus(token) {
 chrome.storage.local.get('token').then(({ token }) => {
   if (token) fetchPlanStatus(token);
 }).catch(() => {});
+
+// Inject content script into already-open tabs after login
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== 'local' || !changes.token) return;
+  const wasLoggedOut = !changes.token.oldValue;
+  const nowLoggedIn  = !!changes.token.newValue;
+  if (!wasLoggedOut || !nowLoggedIn) return;
+  chrome.tabs.query({}, (tabs) => {
+    for (const tab of tabs) {
+      if (!tab.url || !/^https?:/.test(tab.url)) continue;
+      chrome.scripting.executeScript({
+        target: { tabId: tab.id, allFrames: true },
+        files: ['content.js']
+      }).catch(() => {});
+    }
+  });
+});
 
 async function refreshToken() {
   const { refreshToken } = await chrome.storage.local.get('refreshToken');
@@ -171,6 +189,19 @@ chrome.runtime.onMessage.addListener((message, sender) => {
       return;
     }
 
+    // Deep Dive trial gate for non-Pro users
+    if (isDeepDive) {
+      const { isPro, deepDiveTrialUsed = 0 } = await chrome.storage.local.get(['isPro', 'deepDiveTrialUsed']);
+      if (!isPro && deepDiveTrialUsed >= DEEP_DIVE_TRIAL_MAX) {
+        chrome.tabs.sendMessage(tabId, {
+          action: 'result',
+          error: 'UPGRADE_REQUIRED',
+          message: `You've used all ${DEEP_DIVE_TRIAL_MAX} Deep Dive trials. Upgrade to Pro for unlimited.`
+        }).catch(() => {});
+        return;
+      }
+    }
+
     const allowed = await checkLocalLimit();
     if (!allowed) {
       chrome.tabs.sendMessage(tabId, {
@@ -188,6 +219,12 @@ chrome.runtime.onMessage.addListener((message, sender) => {
       if (data.result) {
         await storeCached(message.text, data.result, isDeepDive);
         await incrementLocalCount();
+
+        if (isDeepDive) {
+          const { isPro, deepDiveTrialUsed = 0 } = await chrome.storage.local.get(['isPro', 'deepDiveTrialUsed']);
+          if (!isPro) await chrome.storage.local.set({ deepDiveTrialUsed: deepDiveTrialUsed + 1 });
+        }
+
         chrome.tabs.sendMessage(tabId, { action: 'result', result: data.result, remaining: data.remaining ?? null }).catch(() => {});
       } else {
         chrome.tabs.sendMessage(tabId, { action: 'result', error: data.error ?? 'No response.', message: data.message }).catch(() => {});

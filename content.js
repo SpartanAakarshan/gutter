@@ -113,7 +113,7 @@ function initWidget() {
   chrome.storage.local.get(['isPro', 'deepDive', 'token', 'deepDiveTrialUsed']).then(({ isPro, deepDive, token, deepDiveTrialUsed }) => {
     if (!token) return;
     buildWidget(!!isPro, !!deepDive, deepDiveTrialUsed ?? 0);
-  }).catch(() => {});
+  }).catch((e) => console.warn('[gutter] initWidget storage read failed:', e));
 }
 
 initWidget();
@@ -275,12 +275,16 @@ function update(text, remaining = null) {
   buildBox('Gutter', text, footer);
 }
 
+window.addEventListener('unhandledrejection', (e) => {
+  console.warn('[gutter] unhandled rejection:', e.reason);
+});
+
 let _sessionToken = null;
 let _deepDive = false;
 chrome.storage.local.get(['token', 'deepDive']).then(({ token, deepDive }) => {
   _sessionToken = token ?? null;
   _deepDive = !!deepDive;
-}).catch(() => {});
+}).catch((e) => console.warn('[gutter] initial storage read failed:', e));
 
 // Keep in-memory state in sync with storage changes
 chrome.storage.onChanged.addListener((changes, area) => {
@@ -296,7 +300,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if ('deepDiveTrialUsed' in changes || 'isPro' in changes) {
     chrome.storage.local.get(['isPro', 'deepDive', 'deepDiveTrialUsed']).then(({ isPro, deepDive, deepDiveTrialUsed }) => {
       buildWidget(!!isPro, !!deepDive, deepDiveTrialUsed ?? 0);
-    }).catch(() => {});
+    }).catch((e) => console.warn('[gutter] widget rebuild failed:', e));
   }
 });
 

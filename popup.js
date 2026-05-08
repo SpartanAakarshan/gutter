@@ -44,7 +44,10 @@ function load() {
       const searchesUsed = (localUsage?.date === today) ? (localUsage?.count ?? 0) : 0;
       apply(!!deepDive, !!isPro, deepDiveTrialUsed ?? 0, searchesUsed);
     }
-  );
+  ).catch((e) => {
+    console.warn('[gutter] popup storage read failed:', e);
+    footer.textContent = 'Could not load settings. Try reopening.';
+  });
 }
 
 load();

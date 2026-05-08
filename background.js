@@ -7,6 +7,10 @@ const CACHE_MAX            = 100;
 const LOCAL_LIMIT          = 20;
 const DEEP_DIVE_TRIAL_MAX  = 10;
 
+self.addEventListener('unhandledrejection', (e) => {
+  console.warn('[gutter] unhandled rejection:', e.reason);
+});
+
 function normKey(text, deepDive) {
   return (deepDive ? 'dd:' : 'std:') + text.trim().toLowerCase().slice(0, 100);
 }
@@ -50,10 +54,10 @@ async function fetchPlanStatus(token) {
     const r = await fetch(STATUS_URL, {
       headers: { 'Authorization': `Bearer ${token}` }
     });
-    if (!r.ok) return;
+    if (!r.ok) { console.warn('[gutter] fetchPlanStatus non-OK:', r.status); return; }
     const { isPro } = await r.json();
     await chrome.storage.local.set({ isPro: !!isPro });
-  } catch {}
+  } catch (e) { console.warn('[gutter] fetchPlanStatus failed:', e); }
 }
 
 // Open options page on first install for consent + onboarding
@@ -67,7 +71,7 @@ chrome.runtime.onInstalled.addListener(({ reason }) => {
 // Fetch plan on startup if token exists
 chrome.storage.local.get('token').then(({ token }) => {
   if (token) fetchPlanStatus(token);
-}).catch(() => {});
+}).catch((e) => console.warn('[gutter] startup storage read failed:', e));
 
 // Inject content script into already-open tabs after login
 chrome.storage.onChanged.addListener((changes, area) => {
@@ -101,8 +105,9 @@ async function refreshToken() {
       body: JSON.stringify({ refresh_token: refreshToken }),
       signal: controller.signal
     });
-  } catch {
+  } catch (e) {
     clearTimeout(timer);
+    console.warn('[gutter] token refresh network error:', e);
     return null;
   }
   clearTimeout(timer);
